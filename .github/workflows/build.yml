@@ -63,8 +63,9 @@ jobs:
         if [ "${{ inputs.KSU }}" == "true" ]; then
           cd kernel-6.6 && curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main && cd ..
         fi
+        kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
         cd out && find . -type f -name "Image.gz" && cd ..
         gitsha1=$(git rev-parse --short HEAD)
-        buildDetails="`make kernelversion`-A055X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
+        buildDetails="$kernelVersion-A055X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
       working-directory: kernel_root
