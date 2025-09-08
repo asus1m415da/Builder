@@ -17,7 +17,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    environment: telegramUpload
     steps:
     - uses: actions/checkout@v4
       with:
@@ -38,7 +37,9 @@ jobs:
       run: |
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xaa
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xab
+        echo "INFO: Appending files and extracting ..."
         cat xaa xab > toolchains.tar.gz && tar -xf toolchains.tar.gz && rm toolchains.tar.gz xaa xab
+        [ ! -f $(pwd)/xaa ] && echo "INFO: Extraction operation is completed." || exit 1
       working-directory: kernel_root
 
     - name: Prepare timezone fix
@@ -59,9 +60,11 @@ jobs:
       id: buildKernel
       continue-on-error: true
       run: |
-        [ "${{ inputs.KSU }}" == "true" ] && curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main
+        if [ "${{ inputs.KSU }}" == "true" ]; then
+          cd kernel-6.6 && curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main && cd ..
+        fi
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
-        cd out && find . -type f -name "Image.gz"
+        cd out && find . -type f -name "Image.gz" && cd ..
         gitsha1=$(git rev-parse --short HEAD)
         buildDetails="`make kernelversion`-A055X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
       working-directory: kernel_root
