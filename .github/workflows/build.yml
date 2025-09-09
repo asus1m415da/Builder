@@ -13,6 +13,9 @@ on:
       KSU:
         description: Add KernelSU support
         type: boolean
+      KSU_BRANCH:
+        description: KernelSU branch
+        default: 'main'
         
 jobs:
   build:
@@ -35,6 +38,7 @@ jobs:
 
     - name: Fetch toolchains
       run: |
+        # We divided it into 2 parts, because of Github Release limitations.
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xaa
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xab
         echo "INFO: Appending files and extracting ..."
@@ -56,16 +60,46 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
     
+    - name: Setup KernelSU
+      if: inputs.KSU == true
+      run: |
+        echo "[+] KernelSU setup"
+        git clone https://github.com/rsuntk/KernelSU --single-branch -b ${{ inputs.KSU_BRANCH }}
+        GKI_ROOT=$(pwd)
+        echo "[+] GKI_ROOT: $GKI_ROOT"
+        echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
+        ln -sf $GKI_ROOT/KernelSU/kernel $GKI_ROOT/kernel-6.6/drivers/kernelsu
+        echo "[+] Add KernelSU driver to Makefile"
+        DRIVER_MAKEFILE=$GKI_ROOT/kernel-6.6/drivers/Makefile
+        DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
+        grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
+        grep -q "kernelsu" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_KCONFIG"
+      workding-directory: kernel_root
+
     - name: Build kernel
       id: buildKernel
       continue-on-error: true
       run: |
-        if [ "${{ inputs.KSU }}" == "true" ]; then
-          cd kernel-6.6 && curl -LSs "https://raw.githubusercontent.com/rsuntk/KernelSU/main/kernel/setup.sh" | bash -s main && cd ..
-        fi
+        # grep linux version
         kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
         cd out && find . -type f -name "Image.gz" && cd ..
+        export KBUILD_BUILD_HOST="yukiprjkt"
+        export KBUILD_BUILD_USER="AttentionSeekr"
         gitsha1=$(git rev-parse --short HEAD)
-        buildDetails="$kernelVersion-A055X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
+        buildDetails="`echo $kernelVersion`-A055X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
       working-directory: kernel_root
+
+    - name: Upload Image.gz
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: Image_GZ-${{ steps.buildKernel.outputs.buildDetails }}
+        path: rootdir/kernel_root/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz
+
+    - name: Upload LKM
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: LKM-${{ steps.buildKernel.outputs.buildDetails }}
+        path: rootdir/kernel_root/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/drivers/*
