@@ -38,13 +38,14 @@ jobs:
 
     - name: Fetch toolchains
       run: |
+        cd kernel_root
         # We divided it into 2 parts, because of Github Release limitations.
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xaa
         aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xab
         echo "INFO: Appending files and extracting ..."
         cat xaa xab > toolchains.tar.gz && tar -xf toolchains.tar.gz && rm toolchains.tar.gz xaa xab
         [ ! -f $(pwd)/xaa ] && echo "INFO: Extraction operation is completed." || exit 1
-      working-directory: kernel_root
+      working-directory: rootdir
 
     - name: Prepare timezone fix
       run: |
@@ -63,6 +64,7 @@ jobs:
     - name: Setup KernelSU
       if: inputs.KSU == true
       run: |
+        cd kernel_root
         echo "[+] KernelSU setup"
         git clone https://github.com/rsuntk/KernelSU --single-branch -b ${{ inputs.KSU_BRANCH }}
         GKI_ROOT=$(pwd)
@@ -74,12 +76,15 @@ jobs:
         DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
         grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
         grep -q "kernelsu" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_KCONFIG"
-      working-directory: kernel_root
+        echo "[+] Searching for abi_gki_protected_exports .."
+        [ -f $GKI_ROOT/kernel-6.6/android/abi_gki_protected_exports_aarch64 ] && rm $GKI_ROOT/kernel-6.6/android/abi_gki_protected_exports_aarch64 || echo "[-] No need to remove abi_gki_protected_exports"
+      working-directory: rootdir
 
     - name: Build kernel
       id: buildKernel
       continue-on-error: true
       run: |
+        cd kernel_root
         # grep linux version
         kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
@@ -88,7 +93,13 @@ jobs:
         export KBUILD_BUILD_USER="AttentionSeekr"
         gitsha1=$(git rev-parse --short HEAD)
         buildDetails="`echo $kernelVersion`-A055X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
-      working-directory: kernel_root
+      working-directory: rootdir
+
+    - name: List trees
+      run: |
+        ls -la
+        find . -type f -name "Image.gz" || echo "Image.gz not found!"
+      working-directory: rootdir
 
     - name: Upload Image.gz
       continue-on-error: true
@@ -96,6 +107,7 @@ jobs:
       with:
         name: Image_GZ-${{ steps.buildKernel.outputs.buildDetails }}
         path: rootdir/kernel_root/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz
+        compression-level: 9
 
     - name: Upload LKM
       continue-on-error: true
@@ -103,3 +115,4 @@ jobs:
       with:
         name: LKM-${{ steps.buildKernel.outputs.buildDetails }}
         path: rootdir/kernel_root/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/drivers/*
+        compression-level: 9
