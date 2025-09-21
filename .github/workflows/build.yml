@@ -89,17 +89,18 @@ jobs:
 
     - name: Build kernel
       id: buildKernel
-      continue-on-error: true
       run: |
         cd kernel_root
         # grep linux version
-        kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
-        [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
-        cd out && find . -type f -name "Image.gz" && cd ..
         export KBUILD_BUILD_HOST="yukiprjkt"
         export KBUILD_BUILD_USER="AttentionSeekr"
+        kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
+        [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
+        [ ! -f $(pwd)/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz ] && exit 1
+        cd out && find . -type f -name "Image.gz" && cd ..
         gitsha1=$(git rev-parse --short HEAD)
         buildDetails="`echo $kernelVersion`-A055X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
+        cd .. && cp kernel_root/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz external/anykernel3
       working-directory: rootdir
 
     - name: List trees
@@ -107,6 +108,14 @@ jobs:
         ls -la
         find . -type f -name "Image.gz" || echo "Image.gz not found!"
       working-directory: rootdir
+
+    - name: Upload AnyKernel3
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: AnyKernel3-${{ steps.buildKernel.outputs.buildDetails }}
+        path: rootdir/external/anykernel3/*
+        compression-level: 9
 
     - name: Upload Image.gz
       continue-on-error: true
