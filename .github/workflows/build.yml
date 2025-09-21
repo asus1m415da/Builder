@@ -10,12 +10,12 @@ on:
         description: Repository URL
         default: 'https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6.git'
         required: true
-      KSU:
-        description: Add KernelSU support
-        type: boolean
-      KSU_BRANCH:
-        description: KernelSU branch
-        default: 'main'
+#      KSU:
+#        description: Add KernelSU support
+#        type: boolean
+#      KSU_BRANCH:
+#        description: KernelSU branch
+#        default: 'main'
         
 jobs:
   build:
@@ -62,37 +62,36 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
     
-    - name: Setup KernelSU
-      id: kernelsu_setup
-      if: inputs.KSU == true
-      run: |
-        cd kernel_root
-        echo "[+] KernelSU setup"
-        echo "[+] KernelSU branch: ${{ inputs.KSU_BRANCH }}"
-        git clone https://github.com/rsuntk/KernelSU -b ${{ inputs.KSU_BRANCH }}
-        GKI_ROOT=$(pwd)
-        echo "[+] GKI_ROOT: $GKI_ROOT"
-        echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
-        ln -sf $GKI_ROOT/KernelSU/kernel $GKI_ROOT/kernel-6.6/drivers/kernelsu
-        echo "[+] Add KernelSU driver to Makefile"
-        DRIVER_MAKEFILE=$GKI_ROOT/kernel-6.6/drivers/Makefile
-        DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
-        grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
-        grep -q "kernelsu" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_KCONFIG"
-        echo "[+] Searching for abi_gki_protected_exports .."
-        [ -f $GKI_ROOT/kernel-6.6/android/abi_gki_protected_exports_aarch64 ] && rm $GKI_ROOT/kernel-6.6/android/abi_gki_protected_exports_aarch64 || echo "[-] No need to remove abi_gki_protected_exports"
-        ksuGitVersion="$(cd KernelSU && git rev-list --count HEAD)"
-        ksuVersion="$(expr 10200 + $ksuGitVersion)"
-        echo "KSU_EXTERNAL_VERSION=$ksuVersion" >> $GITHUB_OUTPUT
-        echo "[+] Setup done. KernelSU Version is $ksuVersion"
-      working-directory: rootdir
+#    - name: Setup KernelSU
+#      id: kernelsu_setup
+#      if: inputs.KSU == true
+#      run: |
+#        cd kernel_root
+#        echo "[+] KernelSU setup"
+#        echo "[+] KernelSU branch: ${{ inputs.KSU_BRANCH }}"
+#        git clone https://github.com/rsuntk/KernelSU -b ${{ inputs.KSU_BRANCH }}
+#        GKI_ROOT=$(pwd)
+#        echo "[+] GKI_ROOT: $GKI_ROOT"
+#        echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
+#        ln -sf $GKI_ROOT/KernelSU/kernel $GKI_ROOT/kernel-6.6/drivers/kernelsu
+#        echo "[+] Add KernelSU driver to Makefile"
+#        DRIVER_MAKEFILE=$GKI_ROOT/kernel-6.6/drivers/Makefile
+#        DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
+#        grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
+#        grep -q "kernelsu" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_KCONFIG"
+#        echo "[+] Searching for abi_gki_protected_exports .."
+#        [ -f $GKI_ROOT/kernel-6.6/android/abi_gki_protected_exports_aarch64 ] && rm $GKI_ROOT/kernel-6.6/android/abi_gki_protected_exports_aarch64 || echo "[-] No need to remove abi_gki_protected_exports"
+#        ksuGitVersion="$(cd KernelSU && git rev-list --count HEAD)"
+#        ksuVersion="$(expr 10200 + $ksuGitVersion)"
+#        echo "KSU_EXTERNAL_VERSION=$ksuVersion" >> $GITHUB_OUTPUT
+#        echo "[+] Setup done. KernelSU Version is $ksuVersion"
+#      working-directory: rootdir
 
     - name: Build kernel
       id: buildKernel
       continue-on-error: true
       run: |
         cd kernel_root
-        export KSU_EXTERNAL_VERSION="${{ steps.kernelsu_setup.outputs.KSU_EXTERNAL_VERSION }}"
         # grep linux version
         kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
