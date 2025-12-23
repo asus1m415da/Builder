@@ -4,7 +4,7 @@ on:
     inputs:
       BRANCH:
         description: Kernel branch
-        default: 'master'
+        default: 'latest'
         required: true
       URL:
         description: Repository URL
