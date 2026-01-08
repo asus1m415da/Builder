@@ -10,7 +10,20 @@ on:
         description: Repository URL
         default: 'https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6.git'
         required: true
-        
+      SETUP_KSU:
+        description: Setup KernelSU
+        default: true
+        required: false
+        type: boolean
+      KSU_REPO:
+        description: KernelSU repository link
+        default: 'rsuntk/KernelSU'
+        required: false
+      KSU_BRANCH:
+        description: KernelSU branch
+        default: 'main'
+        required: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -56,13 +69,29 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v4
 
+    - name: Setup KernelSU
+      if: inputs.SETUP_KSU == true
+      run: |
+        cd kernel_root
+        rm $(pwd)/kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
+        echo "[+] KernelSU setup"
+        git clone --single-branch -b ${{ inputs.KSU_BRANCH }} https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
+        GKI_ROOT=$(pwd)
+        echo "[+] GKI_ROOT: $GKI_ROOT"
+        echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
+        ln -sf $(pwd)/KernelSU/kernel $GKI_ROOT/kernel-6.6/drivers/kernelsu
+        echo "[+] Add KernelSU driver to Makefile"
+        DRIVER_MAKEFILE=$GKI_ROOT/kernel-6.6/drivers/Makefile
+        DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
+        grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
+        grep -q "kernelsu" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_KCONFIG"
+      working-directory: rootdir
+
     - name: Build kernel
       id: buildKernel
       run: |
         cd kernel_root
         # grep linux version
-        export KBUILD_BUILD_HOST="yukiprjkt"
-        export KBUILD_BUILD_USER="AttentionSeekr"
         kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
         [ ! -f $(pwd)/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz ] && exit 1
