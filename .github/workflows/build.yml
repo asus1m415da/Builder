@@ -66,9 +66,6 @@ jobs:
         distribution: temurin
         java-version: 21
 
-    - name: Setup Gradle
-      uses: gradle/actions/setup-gradle@v4
-
     - name: Setup KernelSU
       if: inputs.SETUP_KSU == true
       run: |
@@ -103,6 +100,7 @@ jobs:
 
     - name: List trees
       run: |
+        cd kernel_root/out/target/product/a05m/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/
         ls -la
         find . -type f -name "Image.gz" || echo "Image.gz not found!"
       working-directory: rootdir
