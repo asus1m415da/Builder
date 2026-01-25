@@ -8,7 +8,7 @@ on:
         required: true
       URL:
         description: Repository URL
-        default: 'https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6.git'
+        default: 'https://github.com/IsaacCodesStuff/Misaki_kernel.git'
         required: true
       SETUP_KSU:
         description: Setup KernelSU
