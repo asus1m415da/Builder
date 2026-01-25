@@ -1,0 +1,130 @@
+name: Build Kernel
+on:
+  workflow_dispatch:
+    inputs:
+      BRANCH:
+        description: Kernel branch
+        default: 'latest'
+        required: true
+      URL:
+        description: Repository URL
+        default: 'https://github.com/IsaacCodesStuff/Misaki_kernel.git'
+        required: true
+      SETUP_KSU:
+        description: Setup KernelSU
+        default: true
+        required: false
+        type: boolean
+      KSU_REPO:
+        description: KernelSU repository link
+        default: 'rsuntk/KernelSU'
+        required: false
+      KSU_BRANCH:
+        description: KernelSU branch
+        default: 'main'
+        required: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        path: rootdir
+        show-progress: false
+        fetch-depth: 1
+        
+    - name: Prepare dependencies
+      run: |
+        sudo apt update -y
+        sudo apt install rsync bc cpio flex bison aptitude aria2 git python-is-python3 tar perl wget curl lz4 -y
+        sudo aptitude install libssl-dev -y
+        
+    - name: Clone Kernel Source
+      run: git clone --depth=1 --single-branch -b ${{ inputs.BRANCH }} ${{ inputs.URL }} kernel_root
+      working-directory: rootdir
+
+    - name: Fetch toolchains
+      run: |
+        cd kernel_root
+        # We divided it into 2 parts, because of Github Release limitations.
+        aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xaa
+        aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xab
+        echo "INFO: Appending files and extracting ..."
+        cat xaa xab > toolchains.tar.gz && tar -xf toolchains.tar.gz && rm toolchains.tar.gz xaa xab
+        [ ! -f $(pwd)/xaa ] && echo "INFO: Extraction operation is completed." || exit 1
+      working-directory: rootdir
+
+    - name: Prepare timezone fix
+      run: |
+        sudo rm /etc/localtime
+        sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+
+    - name: Setup Java
+      uses: actions/setup-java@v5
+      with:
+        distribution: temurin
+        java-version: 21
+
+    - name: Setup KernelSU
+      if: inputs.SETUP_KSU == true
+      run: |
+        cd kernel_root
+        rm $(pwd)/kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
+        echo "[+] KernelSU setup"
+        git clone --single-branch -b ${{ inputs.KSU_BRANCH }} https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
+        GKI_ROOT=$(pwd)
+        echo "[+] GKI_ROOT: $GKI_ROOT"
+        echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
+        ln -sf $(pwd)/KernelSU/kernel $GKI_ROOT/kernel-6.6/drivers/kernelsu
+        echo "[+] Add KernelSU driver to Makefile"
+        DRIVER_MAKEFILE=$GKI_ROOT/kernel-6.6/drivers/Makefile
+        DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
+        grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
+        grep -q "kernelsu" "$DRIVER_KCONFIG" || sed -i "/endmenu/i\\source \"drivers/kernelsu/Kconfig\"" "$DRIVER_KCONFIG"
+      working-directory: rootdir
+
+    - name: Build kernel
+      id: buildKernel
+      run: |
+        cd kernel_root
+        # grep linux version
+        kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
+        [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
+        [ ! -f $(pwd)/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz ] && exit 1
+        cd out && find . -type f -name "Image.gz" && cd ..
+        gitsha1=$(git rev-parse --short HEAD)
+        buildDetails="`echo $kernelVersion`-A065X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
+        cd .. && cp kernel_root/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz external/anykernel3
+      working-directory: rootdir
+
+    - name: List trees
+      run: |
+        cd kernel_root/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/
+        ls -la
+        find . -type f -name "Image.gz" || echo "Image.gz not found!"
+      working-directory: rootdir
+
+    - name: Upload AnyKernel3
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: AnyKernel3-${{ steps.buildKernel.outputs.buildDetails }}
+        path: rootdir/external/anykernel3/*
+        compression-level: 9
+
+    - name: Upload Image.gz
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: Image_GZ-${{ steps.buildKernel.outputs.buildDetails }}
+        path: rootdir/kernel_root/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz
+        compression-level: 9
+
+    - name: Upload LKM
+      continue-on-error: true
+      uses: actions/upload-artifact@v4
+      with:
+        name: LKM-${{ steps.buildKernel.outputs.buildDetails }}
+        path: rootdir/kernel_root/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/drivers/*
+        compression-level: 9
