@@ -4,11 +4,11 @@ on:
     inputs:
       BRANCH:
         description: Kernel branch
-        default: 'latest'
+        default: 'main'
         required: true
       URL:
         description: Repository URL
-        default: 'https://github.com/IsaacCodesStuff/Misaki_kernel.git'
+        default: ''
         required: true
       SETUP_KSU:
         description: Setup KernelSU
@@ -58,7 +58,7 @@ jobs:
     - name: Prepare timezone fix
       run: |
         sudo rm /etc/localtime
-        sudo ln -s /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
+        sudo ln -s /usr/share/zoneinfo/Asia/Manila /etc/localtime
 
     - name: Setup Java
       uses: actions/setup-java@v5
