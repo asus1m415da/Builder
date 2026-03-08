@@ -8,7 +8,7 @@ on:
         required: true
       URL:
         description: Repository URL
-        default: ''
+        default: 'https://github.com/asus1m415da/Hestia_kernel'
         required: true
       SETUP_KSU:
         description: Setup KernelSU
