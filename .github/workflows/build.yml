@@ -11,16 +11,16 @@ on:
         default: 'https://github.com/asus1m415da/Rem_kernel'
         required: true
       SETUP_KSU:
-        description: Setup KernelSU
+        description: Setup KernelSU Next
         default: true
         required: false
         type: boolean
       KSU_REPO:
-        description: KernelSU repository link
+        description: KernelSU Next repository link
         default: 'KernelSU-Next/KernelSU-Next'
         required: false
       KSU_BRANCH:
-        description: KernelSU branch
+        description: KernelSU Next branch
         default: 'dev'
         required: false
 
@@ -66,7 +66,7 @@ jobs:
         distribution: temurin
         java-version: 21
 
-    - name: Setup KernelSU
+    - name: Setup KernelSU Next
       if: inputs.SETUP_KSU == true
       run: |
         cd kernel_root
