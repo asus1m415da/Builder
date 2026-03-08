@@ -17,11 +17,11 @@ on:
         type: boolean
       KSU_REPO:
         description: KernelSU repository link
-        default: 'rsuntk/KernelSU'
+        default: 'KernelSU-Next/KernelSU-Next'
         required: false
       KSU_BRANCH:
         description: KernelSU branch
-        default: 'main'
+        default: 'stable'
         required: false
 
 jobs:
