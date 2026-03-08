@@ -88,6 +88,10 @@ jobs:
       id: buildKernel
       run: |
         cd kernel_root
+        export KBUILD_BUILD_USER=Oreo
+        export KBUILD_BUILD_HOST=Jaen-Peru
+        export LOCALVERSION_AUTO=n
+        export KBUILD_BUILD_VERSION=1
         # grep linux version
         kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
