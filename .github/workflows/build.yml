@@ -8,7 +8,7 @@ on:
         required: true
       URL:
         description: Repository URL
-        default: 'https://github.com/asus1m415da/Hestia_kernel'
+        default: 'https://github.com/asus1m415da/Rem_kernel'
         required: true
       SETUP_KSU:
         description: Setup KernelSU
@@ -71,8 +71,11 @@ jobs:
       run: |
         cd kernel_root
         rm $(pwd)/kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
-        echo "[+] KernelSU setup"
-        git clone --single-branch -b ${{ inputs.KSU_BRANCH }} https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
+        echo "[+] KernelSU setup for v3.1.0"
+        
+        # EDITADO AQUÍ: Cambiamos la rama por la etiqueta v3.1.0 específica
+        git clone --single-branch -b v3.1.0 https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
+        
         GKI_ROOT=$(pwd)
         echo "[+] GKI_ROOT: $GKI_ROOT"
         echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
