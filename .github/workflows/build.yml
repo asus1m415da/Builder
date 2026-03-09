@@ -8,7 +8,7 @@ on:
         required: true
       URL:
         description: Repository URL
-        default: 'https://github.com/asus1m415da/Hestia_kernel'
+        default: ''
         required: true
       SETUP_KSU:
         description: Setup KernelSU Next
@@ -79,6 +79,7 @@ jobs:
         echo "[+] Aplicando identidad Inti-Kernel v3.1.0"
         sed -i 's/v0.0.1/v3.1.0/g' $(pwd)/KernelSU/kernel/Kbuild
         sed -i 's/fallback: 1/fallback: 33024/g' $(pwd)/KernelSU/kernel/Kbuild
+        sed -i 's/fallback: 1/fallback: 33024/g' $(pwd)/KernelSU/kernel/Makefile
         
         # Creamos el enlace simbólico hacia el árbol del kernel
         GKI_ROOT=$(pwd)
