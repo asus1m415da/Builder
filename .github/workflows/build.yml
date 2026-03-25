@@ -1,3 +1,4 @@
+
 name: Build Kernel
 on:
   workflow_dispatch:
@@ -8,20 +9,20 @@ on:
         required: true
       URL:
         description: Repository URL
-        default: ''
+        default: 'https://github.com/asus1m415da/Hestia_kernel'
         required: true
       SETUP_KSU:
-        description: Setup KernelSU Next
+        description: Setup KernelSU
         default: true
         required: false
         type: boolean
       KSU_REPO:
-        description: KernelSU Next repository link
-        default: 'KernelSU-Next/KernelSU-Next'
+        description: KernelSU repository link
+        default: 'rsuntk/KernelSU'
         required: false
       KSU_BRANCH:
-        description: KernelSU Next branch
-        default: 'dev'
+        description: KernelSU branch
+        default: 'main'
         required: false
 
 jobs:
@@ -59,33 +60,24 @@ jobs:
       run: |
         sudo rm /etc/localtime
         sudo ln -s /usr/share/zoneinfo/Asia/Manila /etc/localtime
-
     - name: Setup Java
       uses: actions/setup-java@v5
       with:
         distribution: temurin
         java-version: 21
 
-    - name: Setup KernelSU Next
+    - name: Setup KernelSU
       if: inputs.SETUP_KSU == true
       run: |
         cd kernel_root
-        rm -f kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
-        
-        # Clonamos la versión específica v3.1.0
-        git clone --single-branch -b v3.1.0 https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
-        
-        # HACK DE IDENTIDAD: Forzamos la versión en el código fuente antes de compilar
-        echo "[+] Aplicando identidad Inti-Kernel v3.1.0"
-        sed -i 's/v0.0.1/v3.1.0/g' $(pwd)/KernelSU/kernel/Kbuild
-        sed -i 's/fallback: 1/fallback: 33024/g' $(pwd)/KernelSU/kernel/Kbuild
-        sed -i 's/fallback: 1/fallback: 33024/g' $(pwd)/KernelSU/kernel/Makefile
-        
-        # Creamos el enlace simbólico hacia el árbol del kernel
+        rm $(pwd)/kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
+        echo "[+] KernelSU setup"
+        git clone --single-branch -b ${{ inputs.KSU_BRANCH }} https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
         GKI_ROOT=$(pwd)
+        echo "[+] GKI_ROOT: $GKI_ROOT"
+        echo "[+] Copy KernelSU driver to $GKI_ROOT/kernel-6.6/drivers"
         ln -sf $(pwd)/KernelSU/kernel $GKI_ROOT/kernel-6.6/drivers/kernelsu
-        
-        # Registro en Makefile y Kconfig
+        echo "[+] Add KernelSU driver to Makefile"
         DRIVER_MAKEFILE=$GKI_ROOT/kernel-6.6/drivers/Makefile
         DRIVER_KCONFIG=$GKI_ROOT/kernel-6.6/drivers/Kconfig
         grep -q "kernelsu" "$DRIVER_MAKEFILE" || printf "\nobj-\$(CONFIG_KSU) += kernelsu/\n" >> "$DRIVER_MAKEFILE"
@@ -96,28 +88,13 @@ jobs:
       id: buildKernel
       run: |
         cd kernel_root
-        
-        # ELIMINAR MARCA DE AGUA: Definimos tu firma personalizada
-        export KBUILD_BUILD_USER=Eduardo
-        export KBUILD_BUILD_HOST=Inti-Kernel
-        export KBUILD_BUILD_VERSION=1
-        export LOCALVERSION_AUTO=n
-        
         # grep linux version
         kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
-        
-        # Localización del binario
-        IMAGE_PATH=$(find out -type f -name "Image.gz" | grep "mgk_64_k66_kernel_aarch64.user" | head -n 1)
-        [ -z "$IMAGE_PATH" ] && exit 1
-        
+        [ ! -f $(pwd)/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz ] && exit 1
         cd out && find . -type f -name "Image.gz" && cd ..
         gitsha1=$(git rev-parse --short HEAD)
-        
-        # Nombramos los archivos con Inti-Kernel
-        buildDetails="Inti-Kernel-${kernelVersion}-A065X_${gitsha1}-$(date +'%Y%m%d%H%M%S')"
-        echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
-        
+        buildDetails="`echo $kernelVersion`-A065X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
         cd .. && cp kernel_root/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz external/anykernel3
       working-directory: rootdir
 
