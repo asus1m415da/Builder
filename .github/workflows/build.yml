@@ -1,4 +1,3 @@
-
 name: Build Kernel
 on:
   workflow_dispatch:
@@ -48,18 +47,31 @@ jobs:
     - name: Fetch toolchains
       run: |
         cd kernel_root
-        # We divided it into 2 parts, because of Github Release limitations.
-        aria2c https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xaa
-        aria2c https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xab
+        echo "INFO: Downloading 6 parts of toolchain..."
+        # Descarga optimizada con múltiples conexiones
+        aria2c -x16 -s16 -k1M https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xaa
+        aria2c -x16 -s16 -k1M https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xab
+        aria2c -x16 -s16 -k1M https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xac
+        aria2c -x16 -s16 -k1M https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xad
+        aria2c -x16 -s16 -k1M https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xae
+        aria2c -x16 -s16 -k1M https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xaf
+        
         echo "INFO: Appending files and extracting ..."
-        cat xaa xab > toolchains.tar.gz && tar -xf toolchains.tar.gz && rm toolchains.tar.gz xaa xab
-        [ ! -f $(pwd)/xaa ] && echo "INFO: Extraction operation is completed." || exit 1
+        # Unimos las 6 partes (xaa xab xac xad xae xaf)
+        cat xa* > toolchains.tar.gz 
+        tar -xf toolchains.tar.gz 
+        
+        echo "INFO: Cleaning up temporary files..."
+        rm toolchains.tar.gz xa*
+        
+        [ -d "clang" ] || [ -d "toolchain" ] && echo "INFO: Extraction operation is completed." || exit 1
       working-directory: rootdir
 
     - name: Prepare timezone fix
       run: |
-        sudo rm /etc/localtime
+        sudo rm -f /etc/localtime
         sudo ln -s /usr/share/zoneinfo/Asia/Manila /etc/localtime
+
     - name: Setup Java
       uses: actions/setup-java@v5
       with:
@@ -70,8 +82,8 @@ jobs:
       if: inputs.SETUP_KSU == true
       run: |
         cd kernel_root
-        rm $(pwd)/kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
-        echo "[+] KernelSU setup"
+        rm -f $(pwd)/kernel-6.6/android/abi_gki_protected_exports_* || echo "[-] No gki protected exports!"
+        echo "[+] KernelSU setup from ${{ inputs.KSU_REPO }}"
         git clone --single-branch -b ${{ inputs.KSU_BRANCH }} https://github.com/${{ inputs.KSU_REPO }}.git KernelSU
         GKI_ROOT=$(pwd)
         echo "[+] GKI_ROOT: $GKI_ROOT"
@@ -88,21 +100,20 @@ jobs:
       id: buildKernel
       run: |
         cd kernel_root
-        # grep linux version
         kernelVersion=$(cd kernel-6.6 && make kernelversion && cd ..)
         [ -f $(pwd)/build_kernel.sh ] && bash build_kernel.sh || exit 1
-        [ ! -f $(pwd)/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz ] && exit 1
-        cd out && find . -type f -name "Image.gz" && cd ..
+        
+        # Ruta de salida corregida según tu log anterior
+        IMG_PATH="out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz"
+        [ ! -f $(pwd)/$IMG_PATH ] && echo "ERROR: Image.gz not found!" && exit 1
+        
         gitsha1=$(git rev-parse --short HEAD)
-        buildDetails="`echo $kernelVersion`-A065X_`echo $gitsha1`-`date +'%Y%m%d%H%M%S'`" && echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
-        cd .. && cp kernel_root/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/Image.gz external/anykernel3
-      working-directory: rootdir
-
-    - name: List trees
-      run: |
-        cd kernel_root/out/target/product/a06/obj/KLEAF_OBJ/dist/kernel_device_modules-6.6/mgk_64_k66_kernel_aarch64.user/
-        ls -la
-        find . -type f -name "Image.gz" || echo "Image.gz not found!"
+        buildDetails="${kernelVersion}-A065X_${gitsha1}-$(date +'%Y%m%d%H%M%S')"
+        echo "buildDetails=$buildDetails" >> $GITHUB_OUTPUT
+        
+        # Preparar AnyKernel3
+        mkdir -p ../external/anykernel3
+        cp $IMG_PATH ../external/anykernel3/
       working-directory: rootdir
 
     - name: Upload AnyKernel3
