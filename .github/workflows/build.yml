@@ -9,7 +9,7 @@ on:
         required: true
       URL:
         description: Repository URL
-        default: 'https://github.com/IsaacCodesStuff/Mito_kernel'
+        default: 'https://github.com/IsaacCodesStuff/A065_kernel'
         required: true
       SETUP_KSU:
         description: Setup KernelSU
@@ -18,7 +18,7 @@ on:
         type: boolean
       KSU_REPO:
         description: KernelSU repository link
-        default: 'rsuntk/KernelSU'
+        default: 'ReSukiSU/ReSukiSU'
         required: false
       KSU_BRANCH:
         description: KernelSU branch
@@ -49,8 +49,8 @@ jobs:
       run: |
         cd kernel_root
         # We divided it into 2 parts, because of Github Release limitations.
-        aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xaa
-        aria2c https://github.com/rsuntkOrgs/android_kernel_samsung_a05m-6.6/releases/download/v1.0/xab
+        aria2c https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xaa
+        aria2c https://github.com/IsaacCodesStuff/samsung_kernel_action/releases/download/1.0/xab
         echo "INFO: Appending files and extracting ..."
         cat xaa xab > toolchains.tar.gz && tar -xf toolchains.tar.gz && rm toolchains.tar.gz xaa xab
         [ ! -f $(pwd)/xaa ] && echo "INFO: Extraction operation is completed." || exit 1
